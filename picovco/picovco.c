@@ -5,7 +5,7 @@
 
 #define buffer_size 16
 
-char state[] = "";                  //gen, out, adc
+int state;                  //
 
 struct osc{
         unsigned int sample_rate;
@@ -14,19 +14,18 @@ struct osc{
         float freq_hz;          
         float pw;                   //0 ~ 1 pulse width
         float fmod_lin;
-        float fmod_exp_volt;
+        float fmod_exp_v;
         bool reset;                 //input should be a pulse
         bool syncout;
     };
     void osc_next(struct osc *osc){
-        int c_length = 10 * osc->sample_rate;
-
-        osc->counter += (osc->freq_hz + osc->fmod_lin + osc->freq_hz*pow(2,fmod_exp_volt));
-        osc->syncout = (osc->counter >= c_length)?true:false;        
-        if (osc->counter >= c_length || osc->reset){
+        float freq_exp_mod = osc->freq_hz*pow(2,osc->fmod_exp_v);
+        osc->counter += (freq_exp_mod + osc->fmod_lin);
+        osc->syncout = (osc->counter >= osc->sample_rate)?true:false;        
+        if (osc->counter >= osc->sample_rate || osc->reset){
             osc->counter = 0;
         }
-        double phase = osc->counter/c_length;
+        double phase = osc->counter/osc->sample_rate;
         osc->output[0] = (int)(phase * 65535); 
         osc->output[1] = (phase > 0.5)? 2*osc->output[0]: 2*(65535-osc->output[0]);
         osc->output[2] = (phase > osc->pw)?1:0;
@@ -51,13 +50,13 @@ int main()
     stdio_init_all();
     while(1){
         switch(state){
-            case "gen":
+            case 0:
 
             break;
-            case "out":
+            case 1:
 
             break;
-            case "adc":
+            case 2:
             
             break;
             default:
