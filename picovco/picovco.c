@@ -1,14 +1,21 @@
+//TBD: buffer write
+
 #include <stdio.h>
 #include <math.h>
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 
 #define BUFFER_SIZE 16
+
+#define PWM_AUDIO_PIN 16
 #define EXP_FM_PIN 26       //ADC0
 #define PITCH_PIN 27        //ADC1
 #define PW_PIN 27           //ADC2
 
+
 int state;                  //
+
+
 
 struct osc{
         unsigned int sample_rate;
@@ -21,6 +28,8 @@ struct osc{
         bool reset;                 //input should be a pulse
         bool syncout;
     };
+
+
     void osc_next(struct osc *osc){
         float freq_exp_mod = osc->freq_hz*pow(2,osc->fmod_exp_v);
         osc->counter += (freq_exp_mod + osc->fmod_lin);
@@ -36,7 +45,26 @@ struct osc{
         osc->output[4] = 0;         //unused
     }
 
+    bool audio_put(repeating_timer_t *rt){  //called at 48khz, fetch buffer and feed to dac
+        pwm_set_gpio_level(16, fetch_buffer());
+    }
+
+    struct inputs
+    {
+        int pitch;
+        float pw;
+        float exp_fm;
+    } input_a;
     
+
+    void adc_get(){
+        adc_select_input(0);
+        input_a.exp_fm = adc_read()/4096 * 10;  //need to trim 10v to 3.3v on this pin
+        adc_select_input(1);
+        input_a.pitch = adc_read() - 2048;
+        adc_select_input(2);
+        input_a.pw = adc_read()/4096;
+    }
 
     short int buffer[BUFFER_SIZE];
     short int *p_buffer = buffer;
@@ -45,7 +73,7 @@ struct osc{
     short int fetch_buffer(){
         p_buffer++;
         if(p_buffer > p_buffer_end){
-            p_buffer = buffer;
+            p_buffer = buffer;  //TBD: refill the buffer
         }
         return *p_buffer;
     }
@@ -55,11 +83,28 @@ int main()
     stdio_init_all();
     adc_init();
     adc_gpio_init(EXP_FM_PIN);
+    adc_gpio_init(PITCH_PIN);
+    adc_gpio_init(PW_PIN);
+    //-----PWM init-----
+    gpio_set_function(16, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(16);
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, 4.f);
+    pwm_init(slice_num, &config, true);
+    //pwm_set_wrap(slice_num,1);
+
+    //-----timer setup-----
+    static repeating_timer_t timer_48k;
+    add_repeating_timer_us(21, &audio_put, NULL, &timer_48k);
+    //-----create osc1-----
+    struct osc osc1{
+        48000, {0,0,0,0,0}, 0, 440, 0.5f, 0, 0, false, true
+    };
 
     while(1){
         switch(state){
             case 0:
-
+            
             break;
             case 1:
 
