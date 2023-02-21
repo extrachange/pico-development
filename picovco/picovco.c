@@ -20,7 +20,7 @@ int state;                  //
 
 struct osc{
         unsigned int sample_rate;
-        unsigned int output[5];     //saw, triangle, square, sine, custom
+        unsigned int output[5];     //saw, triangle, square, sine, reverse saw
         float counter;              //count from 0 to 10x sample rate
         float freq_hz;              //preset pitch
         float pw;                   //0 ~ 1 pulse width
@@ -43,7 +43,7 @@ struct osc{
         osc->output[1] = (phase > 0.5)? 2*osc->output[0]: 2*(65535-osc->output[0]);
         osc->output[2] = (phase > osc->pw)?1:0;
         osc->output[3] = 0.5*(sin(phase)+1)*65535;
-        osc->output[4] = 0;         //unused
+        osc->output[4] = 65535 - osc->output[0];         //unused
     }
 
     
@@ -58,7 +58,7 @@ struct osc{
 
     void adc_get(){
         adc_select_input(0);
-        input_a.exp_fm = adc_read()/4096 * 10;  //need to trim 10v to 3.3v on this pin
+        input_a.exp_fm = adc_read()/4096 * 10;  //need to trim 10v to 3.3v on this pin for pitch
         adc_select_input(1);
         input_a.pitch = adc_read() - 2048;
         adc_select_input(2);
@@ -92,7 +92,7 @@ struct osc{
         }
             return(0);
     }
-
+    //-----audio io-----
     bool audio_put(repeating_timer_t *rt){  //called at 48khz, fetch buffer and feed to dac
         pwm_set_gpio_level(16, buffer_out());
         return(true);
