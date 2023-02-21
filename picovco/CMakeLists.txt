@@ -38,6 +38,7 @@ target_link_libraries(picovco
         pico_stdlib
         hardware_timer
         hardware_adc
+        hardware_pwm
         )
 
 # Add the standard include files to the build
