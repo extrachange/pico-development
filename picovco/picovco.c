@@ -1,4 +1,4 @@
-//TBD: buffer write
+//TBD: osc_update
 
 #include <stdio.h>
 #include <math.h>
@@ -13,12 +13,9 @@
 #define PITCH_PIN 27        //ADC1
 #define PW_PIN 27           //ADC2
 
-
 int state;                  //
 
-
-
-struct osc{
+    struct osc{
         unsigned int sample_rate;
         unsigned int output[5];     //saw, triangle, square, sine, custom
         float counter;              //count from 0 to 10x sample rate
@@ -29,7 +26,6 @@ struct osc{
         bool reset;                 //input should be a pulse
         bool syncout;
     };
-
 
     void osc_next(struct osc *osc){
         float freq_exp_mod = osc->freq_hz*pow(2,osc->fmod_exp_v);
@@ -46,15 +42,12 @@ struct osc{
         osc->output[4] = 0;         //unused
     }
 
-    
-
     struct inputs
     {
         int pitch;
         float pw;
         float exp_fm;
     } input_a;
-    
 
     void adc_get(){
         adc_select_input(0);
@@ -67,26 +60,26 @@ struct osc{
 
 //-----buffer-----
     uint16_t buffer[BUFFER_SIZE];
-    uint16_t *p_buffer = buffer;
+    uint16_t *p_buffer_out = &buffer[BUFFER_SIZE/2];
     uint16_t *p_buffer_in = buffer;
     uint16_t *p_buffer_mid = &buffer[BUFFER_SIZE/2 - 1];
     uint16_t *p_buffer_end = &buffer[BUFFER_SIZE - 1];
     
     uint16_t buffer_out(){
-        p_buffer++;
-        if(p_buffer > p_buffer_end){
-            p_buffer = buffer;  //TBD: refill the buffer
+        p_buffer_out++;
+        if(p_buffer_out > p_buffer_end){
+            p_buffer_out = buffer;  //TBD: refill the buffer
         }
-        return *p_buffer;
+        return *p_buffer_out;
     }
 
     int buffer_in(uint16_t data){   //return 1 if not available, need to be faster then buffer_out
-        if((p_buffer <= p_buffer_mid && p_buffer_in > p_buffer_mid) || (p_buffer > p_buffer_mid && p_buffer_in <= p_buffer_mid)){
+        if((p_buffer_out <= p_buffer_mid && p_buffer_in > p_buffer_mid) || (p_buffer_out > p_buffer_mid && p_buffer_in <= p_buffer_mid)){
             *p_buffer_in = data;
         }else {
             return(1);
         }
-        p_buffer++;
+        p_buffer_out++;
         if(p_buffer_in > p_buffer_end){
             p_buffer_in = buffer;
         }
@@ -113,7 +106,6 @@ int main()
     pwm_set_wrap(slice_num,65535);
     pwm_init(slice_num, &config, true);
     
-
     //-----timer setup-----
     static repeating_timer_t timer_48k;
     add_repeating_timer_us(42, &audio_put, NULL, &timer_48k);   //!!!!now @ 24k for test
@@ -121,10 +113,15 @@ int main()
     struct osc osc1 = {
         48000, {0,0,0,0,0}, 0, 440, 0.5f, 0, 0, false, true
     };
-
-    while(1){
+    uint16_t audio_data = 0;
+    while(1){       //main loop
         
+        if(buffer_in(audio_data)){
 
+        }else{
+            osc_next(osc1);
+            audio_data = osc1.output[0];
+        }
 
 
         /*
